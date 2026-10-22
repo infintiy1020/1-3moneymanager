@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    // 승인할 수 있는 구글 계정 (index.html의 ADMIN_EMAILS와 같게)
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['teletobidonghyun@gmail.com','nibrivalsclan@gmail.com','k.h.y.sty13@gmail.com'];
+    }
+
+    // 학급비 금액: 누구나 읽기, 쓰기는 관리자만
+    match /fund/{d} { allow read: if true; allow write: if isAdmin(); }
+
+    // 입금 신청: 누구나 올리기, 읽기·승인은 관리자만
+    match /requests/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['name','amount','at','status','uid'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 10
+        && request.resource.data.amount is int
+        && request.resource.data.amount >= 100
+        && request.resource.data.amount <= 1000000
+        && request.resource.data.status == 'pending'
+        && request.resource.data.uid == request.auth.uid;
+      allow read, update: if isAdmin();
+    }
+
+    match /wishes/{id} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 80;
+    }
+    match /votes/{id} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && id == request.resource.data.wish + "_" + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.v in [-1, 0, 1];
+    }
+  }
+}
