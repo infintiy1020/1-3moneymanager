@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    // 학급비 금액: 누구나 읽기, 쓰기는 서버(관리자 SDK)만
+    match /fund/{d} { allow read: if true; allow write: if false; }
+    match /deposits/{d} { allow read, write: if false; }
+    // 의견: 로그인(익명 포함)한 사람이 올리기, 모두 읽기
+    match /wishes/{id} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 80;
+    }
+    // 투표: 문서 id가 "의견id_내uid" 형태이고 자기 표만 쓸 수 있음 (1인 1표)
+    match /votes/{id} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && id == request.resource.data.wish + "_" + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.v in [-1, 0, 1];
+    }
+  }
+}
